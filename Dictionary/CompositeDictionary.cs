@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace CourseProject.Dictionary
 {
-//убрать наследование от IDictionary<CompositeDictionaryKey<TId, TName>, TValue>
+//убрать наследование от IDictionary<CompositeDictionaryKey<TId, TName>, TValue> и возможно добавить наследование к IEnumerable
     public class CompositeDictionary<TId, TName, TValue> : IDictionary<CompositeDictionaryKey<TId, TName>, TValue>
     {
         private Dictionary<CompositeDictionaryKey<TId, TName>, TValue> fullDictionary = new Dictionary<CompositeDictionaryKey<TId, TName>, TValue>();
