@@ -3,7 +3,7 @@ using System.Xml.Serialization;
 
 namespace CourseProject.Dictionary
 {
-    public static class Extensions
+    internal static class Extensions
     {
         public static string SerializeObjectToXmlString<T>(this T obj)
         {

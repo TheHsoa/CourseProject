@@ -2,21 +2,24 @@
 
 namespace CourseProject.Dictionary
 {
-    public class CompositeDictionaryKey<TId, TName> : IEquatable<CompositeDictionaryKey<TId, TName>>
+    internal class CompositeDictionaryKey<TId, TName> : IEquatable<CompositeDictionaryKey<TId, TName>>
     {
-        public TId Id { get; }
-        public TName Name { get; }
+        public CompositeKey<TId, TName> Key { get; }
 
-        private string _serializedId;
-        private string _serializedName;
+        private string serializedId;
+        private string serializedName;
 
-        public string SerializedId => _serializedId ?? (_serializedId = Id.SerializeObjectToXmlString());
-        public string SerializedName => _serializedName ?? (_serializedName = Name.SerializeObjectToXmlString());
+        public string SerializedId => serializedId ?? (serializedId = Key.Id.SerializeObjectToXmlString());
+        public string SerializedName => serializedName ?? (serializedName = Key.Name.SerializeObjectToXmlString());
+
+        public CompositeDictionaryKey(CompositeKey<TId, TName> key)
+        {
+            Key = key;
+        }
 
         public CompositeDictionaryKey(TId id, TName name)
         {
-            Name = name;
-            Id = id;
+            Key = new CompositeKey<TId, TName>(id, name);
         }
 
         public override bool Equals(object other)

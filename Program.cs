@@ -1,37 +1,36 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 
 using CourseProject.Dictionary;
+using CourseProject.UserTypes;
 
 namespace CourseProject
 {
-    class Program
+    internal class Program
     {
-        static void Main()
+        private static void Main()
         {
-            var a = new CompositeDictionaryKey<A, B>(new A {B = "123456"}, new B {K = "123456", A = new A {B = "12345"} });
-            var b = new CompositeDictionaryKey<A, B>(new A { B = "12345" }, new B { K = "123456", A = new A { B = "12345" } });
+            var a = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA {UserName = "FirstUserName"}, new UserTypeB { Level = "First", FriendlyUserTypeA = new UserTypeA {UserName = "SecondFriendlyUserName" } });
+            var b = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA { UserName = "SecondUserName" }, new UserTypeB { Level = "First", FriendlyUserTypeA = new UserTypeA { UserName = "FirstFriendlyUserName" } });
+            var e = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA { UserName = "FirstUserName" }, new UserTypeB { Level = "Second", FriendlyUserTypeA = new UserTypeA { UserName = "FirstFriendlyUserName" } });
 
-            var c = new CompositeDictionary<A, B, string>();
+            var c = new CompositeDictionary<UserTypeA, UserTypeB, string>
+                        {
+                            { e.Id, e.Name, "One" }
+                        };
 
-            c.Add(a, "12345");
-            c.Add(b, "123456");
+            c.Add(a.Id, a.Name, "Two");
+            c[b.Id, b.Name] = "Three";
 
-            Console.WriteLine(a.GetHashCode());
-            Console.WriteLine(b.GetHashCode());
-            Console.WriteLine(a.Equals(b));
+            c[a.Id, a.Name] = "Four";
+
+            foreach (var variable in c)
+            {
+                Console.WriteLine($"Id.UserName:{variable.Key.Id.UserName};{Environment.NewLine}"
+                    + $"Name.FriendlyUserTypeA.UserName: {variable.Key.Name.FriendlyUserTypeA.UserName}, Name.Level: {variable.Key.Name.Level};{Environment.NewLine}"
+                    + $"Value: {variable.Value}{Environment.NewLine}{Environment.NewLine}");
+            }
+
             Console.ReadKey();
         }
-    }
-
-    public class A
-    {
-        public string B;
-    }
-
-    public class B
-    {
-        public string K;
-        public A A;
     }
 }
