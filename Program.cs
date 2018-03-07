@@ -9,9 +9,13 @@ namespace CourseProject
     {
         private static void Main()
         {
-            var a = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA {UserName = "FirstUserName"}, new UserTypeB { Level = "First", FriendlyUserTypeA = new UserTypeA {UserName = "SecondFriendlyUserName" } });
-            var b = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA { UserName = "SecondUserName" }, new UserTypeB { Level = "First", FriendlyUserTypeA = new UserTypeA { UserName = "FirstFriendlyUserName" } });
-            var e = new CompositeKey<UserTypeA, UserTypeB>(new UserTypeA { UserName = "FirstUserName" }, new UserTypeB { Level = "Second", FriendlyUserTypeA = new UserTypeA { UserName = "FirstFriendlyUserName" } });
+            var firstUser = new UserTypeA {UserId = 1, UserName = "FirstUserName"};
+            var secondUser = new UserTypeA { UserId = 2, UserName = "SecondUserName" };
+            var thirdUser = new UserTypeA { UserId = 3, UserName = "ThirdUserName" };
+
+            var a = new CompositeKey<UserTypeA, UserTypeB>(firstUser, new UserTypeB { Level = "First", FriendlyUserTypeA = secondUser });
+            var b = new CompositeKey<UserTypeA, UserTypeB>(secondUser, new UserTypeB { Level = "First", FriendlyUserTypeA = firstUser });
+            var e = new CompositeKey<UserTypeA, UserTypeB>(firstUser, new UserTypeB { Level = "Second", FriendlyUserTypeA = thirdUser });
 
             var c = new CompositeDictionary<UserTypeA, UserTypeB, string>
                         {
