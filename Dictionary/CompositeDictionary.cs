@@ -18,6 +18,40 @@ namespace CourseProject.Dictionary
         public bool IsReadOnly => false;
         public ICollection<CompositeKey<TId, TName>> Keys => fullDictionary.Keys;
         public ICollection<TValue> Values => fullDictionary.Values;
+        
+        public TValue this[CompositeKey<TId, TName> key]
+        {
+            get
+            {
+                if (key is null)
+                {
+                    throw new ArgumentNullException(nameof(key));
+                }
+
+                using (rwLock.UseReadLock())
+                {
+                    if (!fullDictionary.ContainsKey(key))
+                    {
+                        throw new KeyNotFoundException();
+                    }
+                    return fullDictionary[key];
+                }
+            }
+            set
+            {
+                using (rwLock.UseUpgratableReadLock())
+                {
+                    if (!fullDictionary.ContainsKey(key))
+                    {
+                        Add(key, value);
+                    }
+                    else
+                    {
+                        SetValue(key.Id, key.Name, value);
+                    }
+                }
+            }
+        }
 
         public TValue this[TId id, TName name]
         {
@@ -33,53 +67,23 @@ namespace CourseProject.Dictionary
                     throw new ArgumentNullException(nameof(name));
                 }
 
-                using (rwLock.UseReadLock())
-                {
-                    if (!ContainsKey(id, name))
-                    {
-                        throw new KeyNotFoundException();
-                    }
-                    return fullDictionary[new CompositeKey<TId, TName>(id, name)];
-                }
+                return this[new CompositeKey<TId, TName>(id, name)];
             }
             set
             {
-                using (rwLock.UseUpgratableReadLock())
+                if (id == null)
                 {
-                    if (!ContainsKey(id, name))
-                    {
-                        Add(id, name, value);
-                    }
-                    else
-                    {
-                        SetValue(id, name, value);
-                    }
+                    throw new ArgumentNullException(nameof(id));
                 }
+
+                if (name == null)
+                {
+                    throw new ArgumentNullException(nameof(name));
+                }
+
+                this[new CompositeKey<TId, TName>(id, name)] = value;
             }
         }
-
-        TValue IDictionary<CompositeKey<TId, TName>, TValue>.this[CompositeKey<TId, TName> key]
-        {
-            get
-            {
-                if (key is null)
-                {
-                    throw new ArgumentNullException(nameof(key));
-                }
-
-                return this[key.Id, key.Name];
-            }
-            set
-            {
-                if (key is null)
-                {
-                    throw new ArgumentNullException(nameof(key));
-                }
-
-                this[key.Id, key.Name] = value;
-            }
-        }
-
 
         public void Add(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
         {
