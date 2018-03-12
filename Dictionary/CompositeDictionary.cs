@@ -183,12 +183,9 @@ namespace CourseProject.Dictionary
         public IEnumerator<KeyValuePair<CompositeKey<TId, TName>, TValue>> GetEnumerator()
         {
             var dictionaryKeyValuePairs = fullDictionary.Select(keyValue =>
-                new KeyValuePair<CompositeKey<TId, TName>, TValue>(keyValue.Key, keyValue.Value)).ToArray();
+                new KeyValuePair<CompositeKey<TId, TName>, TValue>(keyValue.Key, keyValue.Value)).ToList();
 
-            foreach (var keyValuePair in dictionaryKeyValuePairs)
-            {
-                yield return keyValuePair;
-            }
+           return dictionaryKeyValuePairs.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
