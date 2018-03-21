@@ -6,52 +6,13 @@ using System.Threading;
 
 namespace CourseProject.Dictionary
 {
-    public class CompositeDictionary<TId, TName, TValue> : IDictionary<CompositeKey<TId, TName>, TValue>
+    public class CompositeDictionary<TId, TName, TValue> : ICollection<KeyValuePair<CompositeKey<TId, TName>, TValue>>
     {
         private readonly Dictionary<CompositeKey<TId, TName>, TValue> fullDictionary = new Dictionary<CompositeKey<TId, TName>, TValue>();
         private readonly Dictionary<TId, List<TValue>> idDictionary = new Dictionary<TId, List<TValue>>();
         private readonly Dictionary<TName, List<TValue>> nameDictionary = new Dictionary<TName, List<TValue>>();
 
         private readonly ReaderWriterLockSlim rwLock = new ReaderWriterLockSlim();
-
-        public int Count => fullDictionary.Count;
-        public bool IsReadOnly => false;
-        public ICollection<CompositeKey<TId, TName>> Keys => fullDictionary.Keys;
-        public ICollection<TValue> Values => fullDictionary.Values;
-        
-        public TValue this[CompositeKey<TId, TName> key]
-        {
-            get
-            {
-                if (key is null)
-                {
-                    throw new ArgumentNullException(nameof(key));
-                }
-
-                using (rwLock.UseReadLock())
-                {
-                    if (!fullDictionary.ContainsKey(key))
-                    {
-                        throw new KeyNotFoundException();
-                    }
-                    return fullDictionary[key];
-                }
-            }
-            set
-            {
-                using (rwLock.UseUpgratableReadLock())
-                {
-                    if (!fullDictionary.ContainsKey(key))
-                    {
-                        Add(key, value);
-                    }
-                    else
-                    {
-                        SetValue(key.Id, key.Name, value);
-                    }
-                }
-            }
-        }
 
         public TValue this[TId id, TName name]
         {
@@ -67,7 +28,19 @@ namespace CourseProject.Dictionary
                     throw new ArgumentNullException(nameof(name));
                 }
 
-                return this[new CompositeKey<TId, TName>(id, name)];
+                var key = new CompositeKey<TId, TName>(id, name);
+
+                using (rwLock.UseReadLock())
+                {
+                    if (!fullDictionary.ContainsKey(key))
+                    {
+                        throw new KeyNotFoundException();
+                    }
+
+                    var value = fullDictionary[key];
+
+                    return value;
+                }
             }
             set
             {
@@ -81,13 +54,64 @@ namespace CourseProject.Dictionary
                     throw new ArgumentNullException(nameof(name));
                 }
 
-                this[new CompositeKey<TId, TName>(id, name)] = value;
+                var key = new CompositeKey<TId, TName>(id, name);
+
+                using (rwLock.UseUpgratableReadLock())
+                {
+                    if (!fullDictionary.ContainsKey(key))
+                    {
+                        Add(id, name, value);
+                    }
+                    else
+                    {
+                        SetValue(key, value);
+                    }
+                }
             }
+        }
+
+        public IEnumerator<KeyValuePair<CompositeKey<TId, TName>, TValue>> GetEnumerator()
+        {
+            var dictionaryKeyValuePairs = fullDictionary.ToList();
+
+            return dictionaryKeyValuePairs.GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
         }
 
         public void Add(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
         {
-            Add(item.Key, item.Value);
+            Add(item.Key.Id, item.Key.Name, item.Value);
+        }
+
+        public void Add(TId id, TName name, TValue value)
+        {
+            if (id == null)
+            {
+                throw new ArgumentNullException(nameof(id));
+            }
+
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            var compositeKey = new CompositeKey<TId, TName>(id, name);
+
+            using (rwLock.UseWriteLock())
+            {
+                if (fullDictionary.ContainsKey(compositeKey))
+                {
+                    throw new ArgumentException("An item with the same key has already been added.");
+                }
+
+                AddToFullDictionary(compositeKey, value);
+                AddToIdDictionary(id, value);
+                AddToNameDictionary(name, value);
+            }
         }
 
         private void AddToFullDictionary(CompositeKey<TId, TName> key, TValue value)
@@ -118,23 +142,8 @@ namespace CourseProject.Dictionary
                 nameDictionary.Add(name, new List<TValue> { value });
             }
         }
-        public void Add(TId id, TName name, TValue value)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
 
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            var key = new CompositeKey<TId, TName>(id, name);
-            Add(key, value);
-        }
-
-        public void Add(CompositeKey<TId, TName> key, TValue value)
+        private void SetValue(CompositeKey<TId, TName> key, TValue value)
         {
             if (key is null)
             {
@@ -143,33 +152,6 @@ namespace CourseProject.Dictionary
 
             using (rwLock.UseWriteLock())
             {
-                if (fullDictionary.ContainsKey(key))
-                {
-                    throw new ArgumentException("An item with the same key has already been added");
-                }
-
-                AddToFullDictionary(key, value);
-                AddToIdDictionary(key.Id, value);
-                AddToNameDictionary(key.Name, value);
-            }
-        }
-
-        private void SetValue(TId id, TName name, TValue value)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            using (rwLock.UseWriteLock())
-            {
-                var key = new CompositeKey<TId, TName>(id, name);
-
                 if (!fullDictionary.ContainsKey(key))
                 {
                     throw new KeyNotFoundException();
@@ -182,19 +164,6 @@ namespace CourseProject.Dictionary
                 nameDictionary[key.Name].Remove(oldValue);
                 nameDictionary[key.Name].Add(value);
             }
-        }
-
-        public IEnumerator<KeyValuePair<CompositeKey<TId, TName>, TValue>> GetEnumerator()
-        {
-            var dictionaryKeyValuePairs = fullDictionary.Select(keyValue =>
-                new KeyValuePair<CompositeKey<TId, TName>, TValue>(keyValue.Key, keyValue.Value)).ToList();
-
-           return dictionaryKeyValuePairs.GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         public void Clear()
@@ -212,37 +181,6 @@ namespace CourseProject.Dictionary
             using (rwLock.UseReadLock())
             {
                 return fullDictionary.Contains(item);
-            }
-        }
-
-        public bool ContainsKey(CompositeKey<TId, TName> key)
-        {
-            if (key is null)
-            {
-                throw  new ArgumentNullException(nameof(key));
-            }
-
-            using (rwLock.UseReadLock())
-            {
-                return fullDictionary.ContainsKey(key);
-            }
-        }
-
-        public bool ContainsKey(TId id, TName name)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            using (rwLock.UseReadLock())
-            {
-                return fullDictionary.ContainsKey(new CompositeKey<TId, TName>(id, name));
             }
         }
 
@@ -266,16 +204,30 @@ namespace CourseProject.Dictionary
 
             using (rwLock.UseReadLock())
             {
-                fullDictionary.Select(x => new KeyValuePair<CompositeKey<TId, TName>, TValue>(x.Key, x.Value)).ToArray().CopyTo(array, arrayIndex);
+                fullDictionary.ToArray().CopyTo(array, arrayIndex);
+            }
+        }
+        public bool Remove(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
+        {
+            using (rwLock.UseUpgratableReadLock())
+            {
+                return fullDictionary.Contains(item) ? Remove(item.Key.Id, item.Key.Name) : false;
             }
         }
 
-        public bool Remove(CompositeKey<TId, TName> key)
+        public bool Remove(TId id, TName name)
         {
-            if (key is null)
+            if (id == null)
             {
-                throw new ArgumentNullException(nameof(key));
+                throw new ArgumentNullException(nameof(id));
             }
+
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            var key = new CompositeKey<TId, TName>(id, name);
 
             using (rwLock.UseWriteLock())
             {
@@ -309,69 +261,18 @@ namespace CourseProject.Dictionary
             return true;
         }
 
-        public bool Remove(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
+        public int Count
         {
-            using (rwLock.UseUpgratableReadLock())
-            { 
-                return Contains(item) ? Remove(item.Key) : false;
+            get
+            {
+                using (rwLock.UseReadLock())
+                {
+                    return fullDictionary.Count;
+                }
             }
         }
 
-        public bool Remove(TId id, TName name)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            return Remove(new CompositeKey<TId, TName>(id, name));
-        }
-
-        public bool TryGetValue(TId id, TName name, out TValue value)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            return TryGetValue(new CompositeKey<TId, TName>(id, name), out value);
-        }
-
-        public bool TryGetValue(CompositeKey<TId, TName> key, out TValue value)
-        {
-            if (key is null)
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            using (rwLock.UseReadLock())
-            {
-                return fullDictionary.TryGetValue(key, out value);
-            }
-        }
-
-        public bool TryGetById(TId id, out List<TValue> values)
-        {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            using (rwLock.UseReadLock())
-            {
-                return idDictionary.TryGetValue(id, out values);
-            }
-        }
+        public bool IsReadOnly => false;
 
         public List<TValue> GetById(TId id)
         {
@@ -387,20 +288,9 @@ namespace CourseProject.Dictionary
                     throw new KeyNotFoundException();
                 }
 
-                return idDictionary[id];
-            }
-        }
+                var valuesById = idDictionary[id];
 
-        public bool TryGetByName(TName name, out List<TValue> values)
-        {
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            using (rwLock.UseReadLock())
-            {
-                return nameDictionary.TryGetValue(name, out values);
+                return valuesById;
             }
         }
 
@@ -417,7 +307,9 @@ namespace CourseProject.Dictionary
                 {
                     throw new KeyNotFoundException();
                 }
-                return nameDictionary[name];
+
+                var valuesByName = nameDictionary[name];
+                return valuesByName;
             }
         }
     }

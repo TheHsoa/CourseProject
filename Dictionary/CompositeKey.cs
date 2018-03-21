@@ -28,7 +28,8 @@ namespace CourseProject.Dictionary
         {
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
-            return EqualityComparer<TId>.Default.Equals(Id, other.Id) && EqualityComparer<TName>.Default.Equals(Name, other.Name);
+
+            return Id.Equals(other.Id) && Name.Equals(other.Name);
         }
 
         public override bool Equals(object obj)
@@ -42,7 +43,7 @@ namespace CourseProject.Dictionary
         {
             unchecked
             {
-                return (EqualityComparer<TId>.Default.GetHashCode(Id) * 397) ^ EqualityComparer<TName>.Default.GetHashCode(Name);
+                return Id.GetHashCode() * 397 ^ Name.GetHashCode();
             }
         }
     }

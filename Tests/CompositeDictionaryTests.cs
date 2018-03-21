@@ -33,48 +33,6 @@ namespace CourseProject.Tests
         }
 
         [Test]
-        public void TryGetByIdTest()
-        {
-            var compositeDictionary = new CompositeDictionary<string, string, int>
-                                          {
-                                              { "Id", "Name1", 1 },
-                                              { "Id", "Name2", 2 },
-                                              { "Id2", "Name3", 3 }
-                                          };
-            var expectedValues = new List<int>
-                                     {
-                                         1,
-                                         2
-                                     };
-            List<int> actualValues;
-            var result = compositeDictionary.TryGetById("Id", out actualValues);
-
-            Assert.That(result, Is.True);
-            Assert.That(actualValues, Is.EqualTo(expectedValues));
-        }
-
-        [Test]
-        public void TryGetByNameTest()
-        {
-            var compositeDictionary = new CompositeDictionary<string, string, int>
-                                          {
-                                              { "Id1", "Name", 1 },
-                                              { "Id2", "Name", 2 },
-                                              { "Id3", "Name1", 3 }
-                                          };
-            var expectedValues = new List<int>
-                                     {
-                                         1,
-                                         2
-                                     };
-            List<int> actualValues;
-            var result = compositeDictionary.TryGetByName("Name", out actualValues);
-
-            Assert.That(result, Is.True);
-            Assert.That(actualValues, Is.EqualTo(expectedValues));
-        }
-
-        [Test]
         public void GetByIdTest()
         {
             var compositeDictionary = new CompositeDictionary<string, string, int>
