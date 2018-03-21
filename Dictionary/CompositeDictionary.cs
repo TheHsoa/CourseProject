@@ -14,60 +14,14 @@ namespace CourseProject.Dictionary
 
         private readonly ReaderWriterLockSlim rwLock = new ReaderWriterLockSlim();
 
+        public int Count => fullDictionary.Count;
+
+        public bool IsReadOnly => false;
+
         public TValue this[TId id, TName name]
         {
-            get
-            {
-                if (id == null)
-                {
-                    throw new ArgumentNullException(nameof(id));
-                }
-
-                if (name == null)
-                {
-                    throw new ArgumentNullException(nameof(name));
-                }
-
-                var key = new CompositeKey<TId, TName>(id, name);
-
-                using (rwLock.UseReadLock())
-                {
-                    if (!fullDictionary.ContainsKey(key))
-                    {
-                        throw new KeyNotFoundException();
-                    }
-
-                    var value = fullDictionary[key];
-
-                    return value;
-                }
-            }
-            set
-            {
-                if (id == null)
-                {
-                    throw new ArgumentNullException(nameof(id));
-                }
-
-                if (name == null)
-                {
-                    throw new ArgumentNullException(nameof(name));
-                }
-
-                var key = new CompositeKey<TId, TName>(id, name);
-
-                using (rwLock.UseUpgratableReadLock())
-                {
-                    if (!fullDictionary.ContainsKey(key))
-                    {
-                        Add(id, name, value);
-                    }
-                    else
-                    {
-                        SetValue(key, value);
-                    }
-                }
-            }
+            get => GetValue(new CompositeKey<TId, TName>(id, name));
+            set => SetValue(new CompositeKey<TId, TName>(id, name), value);
         }
 
         public IEnumerator<KeyValuePair<CompositeKey<TId, TName>, TValue>> GetEnumerator()
@@ -77,92 +31,33 @@ namespace CourseProject.Dictionary
             return dictionaryKeyValuePairs.GetEnumerator();
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
         public void Add(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
         {
-            Add(item.Key.Id, item.Key.Name, item.Value);
+            Add(item.Key, item.Value);
         }
 
         public void Add(TId id, TName name, TValue value)
         {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            var compositeKey = new CompositeKey<TId, TName>(id, name);
-
-            using (rwLock.UseWriteLock())
-            {
-                if (fullDictionary.ContainsKey(compositeKey))
-                {
-                    throw new ArgumentException("An item with the same key has already been added.");
-                }
-
-                AddToFullDictionary(compositeKey, value);
-                AddToIdDictionary(id, value);
-                AddToNameDictionary(name, value);
-            }
+            Add(new CompositeKey<TId, TName>(id, name), value);
         }
 
-        private void AddToFullDictionary(CompositeKey<TId, TName> key, TValue value)
-        {
-            fullDictionary.Add(key, value);
-        }
-
-        private void AddToIdDictionary(TId id, TValue value)
-        {
-            if (idDictionary.ContainsKey(id))
-            {
-                idDictionary[id].Add(value);
-            }
-            else
-            {
-                idDictionary.Add(id, new List<TValue> { value });
-            }
-        }
-
-        private void AddToNameDictionary(TName name, TValue value)
-        {
-            if (nameDictionary.ContainsKey(name))
-            {
-                nameDictionary[name].Add(value);
-            }
-            else
-            {
-                nameDictionary.Add(name, new List<TValue> { value });
-            }
-        }
-
-        private void SetValue(CompositeKey<TId, TName> key, TValue value)
+        public void SetValue(CompositeKey<TId, TName> key, TValue value)
         {
             if (key is null)
             {
                 throw new ArgumentNullException(nameof(key));
             }
 
-            using (rwLock.UseWriteLock())
+            using (rwLock.UseUpgratableReadLock())
             {
                 if (!fullDictionary.ContainsKey(key))
                 {
-                    throw new KeyNotFoundException();
+                    Add(key, value);
                 }
-
-                var oldValue = fullDictionary[key];
-                fullDictionary[key] = value;
-                idDictionary[key.Id].Remove(oldValue);
-                idDictionary[key.Id].Add(value);
-                nameDictionary[key.Name].Remove(oldValue);
-                nameDictionary[key.Name].Add(value);
+                else
+                {
+                    ChangeValue(key, value);
+                }
             }
         }
 
@@ -196,85 +91,34 @@ namespace CourseProject.Dictionary
                 throw new ArgumentOutOfRangeException(nameof(arrayIndex));
             }
 
-            if (array.Length - arrayIndex < Count)
-            {
-                throw new ArgumentException(
-                    "The number of elements in the source dictionary values is greater than the available space from index to the end of the destination array.");
-            }
-
             using (rwLock.UseReadLock())
             {
-                fullDictionary.ToArray().CopyTo(array, arrayIndex);
+                if (array.Length - arrayIndex < Count)
+                {
+                    throw new ArgumentException(message: "The number of elements in the source dictionary values is greater than the available space from index to the end of the destination array.");
+                }
+
+                foreach (var keyValue in fullDictionary)
+                {
+                    array[arrayIndex++] = new KeyValuePair<CompositeKey<TId, TName>, TValue>(keyValue.Key, keyValue.Value);
+                }
             }
         }
+
         public bool Remove(KeyValuePair<CompositeKey<TId, TName>, TValue> item)
         {
             using (rwLock.UseUpgratableReadLock())
             {
-                return fullDictionary.Contains(item) ? Remove(item.Key.Id, item.Key.Name) : false;
+                return fullDictionary.Contains(item) ? Remove(item.Key) : false;
             }
         }
 
         public bool Remove(TId id, TName name)
         {
-            if (id == null)
-            {
-                throw new ArgumentNullException(nameof(id));
-            }
-
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            var key = new CompositeKey<TId, TName>(id, name);
-
-            using (rwLock.UseWriteLock())
-            {
-                if (!fullDictionary.ContainsKey(key) || !idDictionary.ContainsKey(key.Id) || !nameDictionary.ContainsKey(key.Name))
-                {
-                    return false;
-                }
-
-                var value = fullDictionary[key];
-
-                if (idDictionary[key.Id].Count == 1)
-                {
-                    idDictionary.Remove(key.Id);
-                }
-                else
-                {
-                    idDictionary[key.Id].Remove(value);
-                }
-
-                if (nameDictionary[key.Name].Count == 1)
-                {
-                    nameDictionary.Remove(key.Name);
-                }
-                else
-                {
-                    nameDictionary[key.Name].Remove(value);
-                }
-
-                fullDictionary.Remove(key);
-            }
-            return true;
+            return Remove(new CompositeKey<TId, TName>(id, name));
         }
 
-        public int Count
-        {
-            get
-            {
-                using (rwLock.UseReadLock())
-                {
-                    return fullDictionary.Count;
-                }
-            }
-        }
-
-        public bool IsReadOnly => false;
-
-        public List<TValue> GetById(TId id)
+        public IReadOnlyCollection<TValue> GetById(TId id)
         {
             if (id == null)
             {
@@ -288,13 +132,12 @@ namespace CourseProject.Dictionary
                     throw new KeyNotFoundException();
                 }
 
-                var valuesById = idDictionary[id];
-
+                var valuesById = idDictionary[id].ToArray();
                 return valuesById;
             }
         }
 
-        public List<TValue> GetByName(TName name)
+        public IReadOnlyCollection<TValue> GetByName(TName name)
         {
             if (name == null)
             {
@@ -308,8 +151,183 @@ namespace CourseProject.Dictionary
                     throw new KeyNotFoundException();
                 }
 
-                var valuesByName = nameDictionary[name];
+                var valuesByName = nameDictionary[name].ToArray();
                 return valuesByName;
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        private static void AddToKeyPartDictionary<TKeyPart>(IDictionary<TKeyPart, List<TValue>> dictionary, TKeyPart key, TValue value)
+        {
+            if (dictionary.ContainsKey(key))
+            {
+                dictionary[key].Add(value);
+            }
+            else
+            {
+                dictionary.Add(key,
+                               new List<TValue>
+                                   {
+                                       value
+                                   });
+            }
+        }
+
+        private static void ChangeKeyPartDictionary<TKeyPart>(IDictionary<TKeyPart, List<TValue>> dictionary, TKeyPart key, TValue oldValue, TValue newValue)
+        {
+            dictionary[key].Remove(oldValue);
+            dictionary[key].Add(newValue);
+        }
+
+        private static void RemoveFromKeyPartDictionary<TKeyPart>(IDictionary<TKeyPart, List<TValue>> dictionary, TKeyPart key, TValue value)
+        {
+            if (dictionary[key].Count == 1)
+            {
+                dictionary.Remove(key);
+            }
+            else
+            {
+                dictionary[key].Remove(value);
+            }
+        }
+
+        private void Add(CompositeKey<TId, TName> key, TValue value)
+        {
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (key.Id == null)
+            {
+                throw new ArgumentNullException(nameof(key.Id));
+            }
+
+            if (key.Name == null)
+            {
+                throw new ArgumentNullException(nameof(key.Name));
+            }
+
+            using (rwLock.UseWriteLock())
+            {
+                if (fullDictionary.ContainsKey(key))
+                {
+                    throw new ArgumentException(message: "An item with the same key has already been added.");
+                }
+
+                AddToFullDictionary(key, value);
+                AddToIdDictionary(key.Id, value);
+                AddToNameDictionary(key.Name, value);
+            }
+        }
+
+        private void AddToFullDictionary(CompositeKey<TId, TName> key, TValue value)
+        {
+            fullDictionary.Add(key, value);
+        }
+
+        private void AddToIdDictionary(TId id, TValue value)
+        {
+            AddToKeyPartDictionary(idDictionary, id, value);
+        }
+
+        private void AddToNameDictionary(TName name, TValue value)
+        {
+            AddToKeyPartDictionary(nameDictionary, name, value);
+        }
+
+        private void ChangeValue(CompositeKey<TId, TName> key, TValue value)
+        {
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (key.Id == null)
+            {
+                throw new ArgumentNullException(nameof(key.Id));
+            }
+
+            if (key.Name == null)
+            {
+                throw new ArgumentNullException(nameof(key.Name));
+            }
+
+            using (rwLock.UseWriteLock())
+            {
+                var oldValue = fullDictionary[key];
+                fullDictionary[key] = value;
+                ChangeKeyPartDictionary(idDictionary, key.Id, oldValue, value);
+                ChangeKeyPartDictionary(nameDictionary, key.Name, oldValue, value);
+            }
+        }
+
+        private bool Remove(CompositeKey<TId, TName> key)
+        {
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (key.Id == null)
+            {
+                throw new ArgumentNullException(nameof(key.Id));
+            }
+
+            if (key.Name == null)
+            {
+                throw new ArgumentNullException(nameof(key.Name));
+            }
+
+            using (rwLock.UseWriteLock())
+            {
+                if (!fullDictionary.ContainsKey(key) || !idDictionary.ContainsKey(key.Id) || !nameDictionary.ContainsKey(key.Name))
+                {
+                    return false;
+                }
+
+                var value = fullDictionary[key];
+
+                RemoveFromKeyPartDictionary(idDictionary, key.Id, value);
+                RemoveFromKeyPartDictionary(nameDictionary, key.Name, value);
+
+                fullDictionary.Remove(key);
+            }
+
+            return true;
+        }
+
+        private TValue GetValue(CompositeKey<TId, TName> key)
+        {
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            if (key.Id == null)
+            {
+                throw new ArgumentNullException(nameof(key.Id));
+            }
+
+            if (key.Name == null)
+            {
+                throw new ArgumentNullException(nameof(key.Name));
+            }
+
+            using (rwLock.UseReadLock())
+            {
+                if (!fullDictionary.ContainsKey(key))
+                {
+                    throw new KeyNotFoundException();
+                }
+
+                var value = fullDictionary[key];
+
+                return value;
             }
         }
     }
