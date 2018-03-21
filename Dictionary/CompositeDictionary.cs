@@ -41,26 +41,6 @@ namespace CourseProject.Dictionary
             Add(new CompositeKey<TId, TName>(id, name), value);
         }
 
-        public void SetValue(CompositeKey<TId, TName> key, TValue value)
-        {
-            if (key is null)
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            using (rwLock.UseUpgratableReadLock())
-            {
-                if (!fullDictionary.ContainsKey(key))
-                {
-                    Add(key, value);
-                }
-                else
-                {
-                    ChangeValue(key, value);
-                }
-            }
-        }
-
         public void Clear()
         {
             using (rwLock.UseWriteLock())
@@ -192,6 +172,26 @@ namespace CourseProject.Dictionary
             else
             {
                 dictionary[key].Remove(value);
+            }
+        }
+
+        private void SetValue(CompositeKey<TId, TName> key, TValue value)
+        {
+            if (key is null)
+            {
+                throw new ArgumentNullException(nameof(key));
+            }
+
+            using (rwLock.UseUpgratableReadLock())
+            {
+                if (!fullDictionary.ContainsKey(key))
+                {
+                    Add(key, value);
+                }
+                else
+                {
+                    ChangeValue(key, value);
+                }
             }
         }
 
